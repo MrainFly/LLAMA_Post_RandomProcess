@@ -47,7 +47,7 @@ def main() -> int:
         [executable, str(count)], check=False, capture_output=True, text=True
     )
     if result.returncode != 0:
-        print(result.stderr.strip() or "C program failed")
+        print(result.stderr.strip() or f"C program exited with status {result.returncode}")
         return result.returncode
 
     c_tokens = []
@@ -58,7 +58,7 @@ def main() -> int:
         try:
             c_tokens.append(int(stripped))
         except ValueError:
-            print(f"golden verify failed: non-integer output line from C program: {stripped}")
+            print(f"Golden verify failed: non-integer output line from C program: {stripped}")
             return 1
     expected = generate_expected(count)
     if c_tokens != expected:
