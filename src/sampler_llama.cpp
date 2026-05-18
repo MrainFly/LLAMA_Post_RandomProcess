@@ -15,6 +15,8 @@ struct Candidate {
   double prob;
 };
 
+constexpr double kMinTopP = 1e-6;
+
 size_t effective_history_window(const rp_sampling_config *config) {
   // 0 is a sentinel value meaning "use maximum available history".
   if (config->history_window == 0 || config->history_window > RP_MAX_HISTORY) {
@@ -24,10 +26,8 @@ size_t effective_history_window(const rp_sampling_config *config) {
 }
 
 size_t token_repeat_count(const rp_sampler_state *state, uint32_t token_id,
-                          size_t history_window) {
+                          size_t start) {
   size_t count = 0;
-  const size_t start =
-      state->history_len > history_window ? state->history_len - history_window : 0;
   for (size_t i = start; i < state->history_len; ++i) {
     if (state->history[i] == token_id) {
       ++count;
@@ -39,8 +39,10 @@ size_t token_repeat_count(const rp_sampler_state *state, uint32_t token_id,
 void apply_penalties(std::vector<Candidate> &candidates, const rp_sampler_state *state,
                      const rp_sampling_config *config) {
   const size_t window = effective_history_window(config);
+  const size_t start =
+      state->history_len > window ? state->history_len - window : 0;
   for (auto &c : candidates) {
-    const size_t count = token_repeat_count(state, c.token_id, window);
+    const size_t count = token_repeat_count(state, c.token_id, start);
     if (count == 0) {
       continue;
     }
@@ -108,7 +110,7 @@ void apply_top_p(std::vector<Candidate> &candidates, float p) {
   if (candidates.size() <= 1 || p >= 1.0f) {
     return;
   }
-  const double top_p = p <= 0.0f ? 1e-6 : p;
+  const double top_p = p <= 0.0f ? kMinTopP : p;
   compute_softmax(candidates);
 
   std::sort(candidates.begin(), candidates.end(),
