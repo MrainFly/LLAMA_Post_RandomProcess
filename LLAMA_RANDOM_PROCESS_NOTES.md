@@ -103,8 +103,8 @@ llama 内核做推理时，模型先给出当前 step 的 **logits**。
 
 当前实现集中在：
 
-- `/home/runner/work/LLAMA_Post_RandomProcess/LLAMA_Post_RandomProcess/src/random_token.c`
-- `/home/runner/work/LLAMA_Post_RandomProcess/LLAMA_Post_RandomProcess/tools/golden_verify.py`
+- `src/random_token.c`
+- `tools/golden_verify.py`
 
 ### 3.1 当前 C 实现实际做了什么
 
@@ -191,7 +191,7 @@ llama 内核做推理时，模型先给出当前 step 的 **logits**。
 
 如果后续要先用 Python 版本把官方思路跑通，建议按下面方式组织。
 
-## 5.1 先明确：Python 版本的目标不是复刻当前 demo，而是复刻 sampling pipeline
+## 5.1 先明确 Python 版本的目标：不是复刻当前 demo，而是复刻 sampling pipeline
 
 Python 版本不应该只是把下面逻辑搬过去：
 
@@ -375,8 +375,8 @@ Python 版本不应该只是把下面逻辑搬过去：
 
 ### 本仓库
 
-- `/home/runner/work/LLAMA_Post_RandomProcess/LLAMA_Post_RandomProcess/src/random_token.c`
-- `/home/runner/work/LLAMA_Post_RandomProcess/LLAMA_Post_RandomProcess/tools/golden_verify.py`
+- `src/random_token.c`
+- `tools/golden_verify.py`
 
 ### llama.cpp 官方实现参考
 
