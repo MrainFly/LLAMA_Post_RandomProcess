@@ -91,12 +91,12 @@ def main() -> int:
     if args.steps <= 0:
         print("Error: steps must be > 0", file=sys.stderr)
         return 2
-    if args.tokens is not None and len(args.tokens) == 0:
+    if len(args.tokens) == 0:
         print("Error: --tokens cannot be empty", file=sys.stderr)
         return 2
 
     state = TinyState(hidden=[0.0] * DIM)
-    prompt = args.tokens if args.tokens is not None else [TOKEN_IDS[0]]
+    prompt = args.tokens
 
     for token in prompt:
         _ = inference_step(state, token)
