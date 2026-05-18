@@ -77,8 +77,8 @@ int main(int argc, char **argv) {
       continue;
     }
     if (strcmp(arg, "--top-k") == 0 && i + 1 < argc) {
-      if (!parse_int_arg(argv[++i], 1, &config.top_k)) {
-        fprintf(stderr, "top-k must be >= 1\n");
+      if (!parse_int_arg(argv[++i], 0, &config.top_k)) {
+        fprintf(stderr, "top-k must be >= 0\n");
         return 1;
       }
       continue;

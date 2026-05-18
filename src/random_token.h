@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define RP_MAX_HISTORY 256u
+
 void rp_reset(void);
 uint32_t rp_next_token_id(void);
 size_t rp_token_count(void);
@@ -23,7 +25,7 @@ typedef struct {
 
 typedef struct {
   uint32_t rng_state;
-  uint32_t history[256];
+  uint32_t history[RP_MAX_HISTORY];
   size_t history_len;
 } rp_sampler_state;
 

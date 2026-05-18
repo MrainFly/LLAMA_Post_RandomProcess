@@ -325,11 +325,11 @@ uint32_t rp_sample_from_logits(rp_sampler_state *state,
   }
 
   size_t effective_history_window = config->history_window;
-  if (effective_history_window > sizeof(state->history) / sizeof(state->history[0])) {
-    effective_history_window = sizeof(state->history) / sizeof(state->history[0]);
+  if (effective_history_window > RP_MAX_HISTORY) {
+    effective_history_window = RP_MAX_HISTORY;
   }
   if (effective_history_window == 0) {
-    effective_history_window = sizeof(state->history) / sizeof(state->history[0]);
+    effective_history_window = RP_MAX_HISTORY;
   }
 
   for (size_t i = 0; i < vocab_size; ++i) {
@@ -383,14 +383,13 @@ uint32_t rp_sample_from_logits(rp_sampler_state *state,
   uint32_t sampled = candidates[chosen_idx].token_id;
   free(candidates);
 
-  if (state->history_len < sizeof(state->history) / sizeof(state->history[0])) {
+  if (state->history_len < RP_MAX_HISTORY) {
     state->history[state->history_len++] = sampled;
   } else {
     memmove(state->history, state->history + 1,
-            (sizeof(state->history) / sizeof(state->history[0]) - 1) *
-                sizeof(state->history[0]));
-    state->history[sizeof(state->history) / sizeof(state->history[0]) - 1] = sampled;
-    state->history_len = sizeof(state->history) / sizeof(state->history[0]);
+            (RP_MAX_HISTORY - 1) * sizeof(state->history[0]));
+    state->history[RP_MAX_HISTORY - 1] = sampled;
+    state->history_len = RP_MAX_HISTORY;
   }
 
   return sampled;

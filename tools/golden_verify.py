@@ -6,6 +6,8 @@ import sys
 from dataclasses import dataclass
 
 RNG_MASK = 0x7FFFFFFF
+MAX_HISTORY = 256
+EPSILON = 1e-8
 OFFLINE_TOKEN_IDS = [128000, 128001, 128002, 128003, 128004, 128005, 128006, 128007]
 OFFLINE_LOGITS = [
     [2.1, 1.6, 0.5, -0.4, -1.0, -2.0, 0.9, 1.3],
@@ -66,7 +68,7 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
     for step in range(count):
         logits = OFFLINE_LOGITS[step % len(OFFLINE_LOGITS)]
         candidates = []
-        window = max(1, min(config.history_window, 256))
+        window = max(1, min(config.history_window, MAX_HISTORY))
         recent_history = history[-window:]
 
         for token_id, base_logit in zip(OFFLINE_TOKEN_IDS, logits):
@@ -129,7 +131,7 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
                         max_prob = max((c["prob"] for c in kept), default=0.0)
                         threshold = config.min_p * max_prob
                         for c in candidates:
-                            if c["keep"] and c["prob"] + 1e-8 < threshold:
+                            if c["keep"] and c["prob"] + EPSILON < threshold:
                                 c["keep"] = False
                         if not any(c["keep"] for c in candidates):
                             max(kept, key=lambda c: c["prob"])["keep"] = True
@@ -151,8 +153,8 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
 
         out.append(token)
         history.append(token)
-        if len(history) > 256:
-            history = history[-256:]
+        if len(history) > MAX_HISTORY:
+            history = history[-MAX_HISTORY:]
 
     return out
 
