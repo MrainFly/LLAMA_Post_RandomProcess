@@ -1,6 +1,7 @@
 #include "random_token.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -10,7 +11,8 @@ int main(int argc, char **argv) {
     char *end = NULL;
     errno = 0;
     long parsed = strtol(argv[1], &end, 10);
-    if (errno != 0 || end == argv[1] || *end != '\0' || parsed <= 0) {
+    if (errno != 0 || end == argv[1] || *end != '\0' || parsed <= 0 ||
+        parsed > INT_MAX) {
       fprintf(stderr, "count must be a valid positive integer\n");
       return 1;
     }
