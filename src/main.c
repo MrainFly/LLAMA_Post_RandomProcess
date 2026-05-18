@@ -1,16 +1,20 @@
 #include "random_token.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
   int count = 16;
   if (argc > 1) {
-    count = atoi(argv[1]);
-    if (count <= 0) {
-      fprintf(stderr, "count must be a positive integer\n");
+    char *end = NULL;
+    errno = 0;
+    long parsed = strtol(argv[1], &end, 10);
+    if (errno != 0 || end == argv[1] || *end != '\0' || parsed <= 0) {
+      fprintf(stderr, "count must be a valid positive integer\n");
       return 1;
     }
+    count = (int)parsed;
   }
 
   rp_reset();

@@ -50,7 +50,16 @@ def main() -> int:
         print(result.stderr.strip() or "C program failed")
         return result.returncode
 
-    c_tokens = [int(line.strip()) for line in result.stdout.splitlines() if line.strip()]
+    c_tokens = []
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            c_tokens.append(int(stripped))
+        except ValueError:
+            print(f"Golden verify failed: non-integer output line from C program: {stripped}")
+            return 1
     expected = generate_expected(count)
     if c_tokens != expected:
         print("Golden verify failed")
