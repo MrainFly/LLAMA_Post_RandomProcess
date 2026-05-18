@@ -58,7 +58,7 @@ def main() -> int:
         try:
             c_tokens.append(int(stripped))
         except ValueError:
-            print(f"Golden verify failed: non-integer output line from C program: {stripped}")
+            print(f"golden verify failed: non-integer output line from C program: {stripped}")
             return 1
     expected = generate_expected(count)
     if c_tokens != expected:
