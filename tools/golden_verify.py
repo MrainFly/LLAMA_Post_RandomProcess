@@ -68,10 +68,10 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
     for step in range(count):
         logits = OFFLINE_LOGITS[step % len(OFFLINE_LOGITS)]
         candidates = []
-        if config.history_window == 0:
-            window = MAX_HISTORY
-        else:
-            window = max(1, min(config.history_window, MAX_HISTORY))
+        effective_history_window = (
+            MAX_HISTORY if config.history_window == 0 else config.history_window
+        )
+        window = max(1, min(effective_history_window, MAX_HISTORY))
         recent_history = history[-window:]
 
         for token_id, base_logit in zip(OFFLINE_TOKEN_IDS, logits):
@@ -82,6 +82,7 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
                     if logit >= 0.0:
                         logit /= config.repeat_penalty
                     else:
+                        # Match llama-style behavior for negative logits.
                         logit *= config.repeat_penalty
                 logit -= config.presence_penalty
                 logit -= repeat_count * config.frequency_penalty
@@ -107,8 +108,8 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
                 kept = [c for c in candidates if c["keep"]]
                 token = max(kept, key=lambda c: c["logit"])["token_id"]
             else:
-                top_p = max(config.top_p, 1e-6)
-                if top_p < 1.0:
+                effective_top_p = max(config.top_p, 1e-6)
+                if effective_top_p < 1.0:
                     sorted_kept = sorted(
                         [c for c in candidates if c["keep"]],
                         key=lambda c: c["prob"],
@@ -119,7 +120,7 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
                     for idx, c in enumerate(sorted_kept):
                         cumulative += c["prob"]
                         keep_ids.add(c["token_id"])
-                        if cumulative >= top_p and idx + 1 < len(sorted_kept):
+                        if cumulative >= effective_top_p and idx + 1 < len(sorted_kept):
                             break
                     for c in candidates:
                         if c["keep"] and c["token_id"] not in keep_ids:

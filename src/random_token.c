@@ -215,7 +215,7 @@ static void rp_apply_min_p(rp_candidate *candidates, size_t vocab_size, float mi
       max_prob = candidates[i].prob;
     }
   }
-  if (max_prob <= 0.0f) {
+  if (max_prob <= 0.0) {
     return;
   }
 
@@ -338,7 +338,9 @@ uint32_t rp_sample_from_logits(rp_sampler_state *state,
         rp_count_token_in_history(state, token_ids[i], effective_history_window);
     if (repeat_count > 0) {
       if (config->repeat_penalty > 0.0f && config->repeat_penalty != 1.0f) {
-        if (logit >= 0.0f) {
+        // Match llama-style behavior: positive logits divide, negative logits
+        // multiply, both reducing repeated-token preference.
+        if (logit >= 0.0) {
           logit /= config->repeat_penalty;
         } else {
           logit *= config->repeat_penalty;
