@@ -57,6 +57,14 @@ class GoldenVerifyTest(unittest.TestCase):
             msg=f"verify failed\nstdout:\n{verify.stdout}\nstderr:\n{verify.stderr}",
         )
 
+    def test_boundary_top_k_zero(self) -> None:
+        verify = self.run_verify("--top-k", "0")
+        self.assertEqual(
+            0,
+            verify.returncode,
+            msg=f"verify failed\nstdout:\n{verify.stdout}\nstderr:\n{verify.stderr}",
+        )
+
     def test_boundary_min_p_zero(self) -> None:
         verify = self.run_verify("--min-p", "0.0")
         self.assertEqual(
@@ -74,6 +82,14 @@ class GoldenVerifyTest(unittest.TestCase):
             "--presence-penalty",
             "0.5",
         )
+        self.assertEqual(
+            0,
+            verify.returncode,
+            msg=f"verify failed\nstdout:\n{verify.stdout}\nstderr:\n{verify.stderr}",
+        )
+
+    def test_history_window_zero_means_max_history(self) -> None:
+        verify = self.run_verify("--history-window", "0")
         self.assertEqual(
             0,
             verify.returncode,

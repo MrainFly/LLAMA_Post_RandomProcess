@@ -1,25 +1,10 @@
 #!/usr/bin/env python3
 import argparse
-import math
 import subprocess
-import sys
 from dataclasses import dataclass
 
-RNG_MASK = 0x7FFFFFFF
-MAX_HISTORY = 256
-EPSILON = 1e-8
-OFFLINE_TOKEN_IDS = [128000, 128001, 128002, 128003, 128004, 128005, 128006, 128007]
-OFFLINE_LOGITS = [
-    [2.1, 1.6, 0.5, -0.4, -1.0, -2.0, 0.9, 1.3],
-    [1.7, 1.3, 0.4, -0.2, -1.4, -1.9, 1.2, 0.8],
-    [1.9, 1.5, 0.6, -0.3, -1.2, -2.1, 0.7, 1.1],
-    [2.0, 1.4, 0.2, -0.6, -1.5, -2.0, 0.8, 1.0],
-    [1.8, 1.1, 0.3, -0.1, -1.1, -2.3, 1.4, 0.9],
-    [2.2, 1.2, 0.7, -0.5, -1.0, -1.8, 0.6, 1.5],
-]
 
-
-@dataclass
+@dataclass(frozen=True)
 class SamplingConfig:
     seed: int = 0x12345678
     temperature: float = 0.8
@@ -32,136 +17,15 @@ class SamplingConfig:
     history_window: int = 64
 
 
-def next_state(current: int) -> int:
-    return (1103515245 * current + 12345) & RNG_MASK
-
-
-def next_uniform(state: int) -> tuple[float, int]:
-    state = next_state(state)
-    return state / (RNG_MASK + 1), state
-
-
-def softmax_kept(candidates: list[dict]) -> bool:
-    kept = [c for c in candidates if c["keep"]]
-    if not kept:
-        return False
-    max_logit = max(c["logit"] for c in kept)
-    probs = [math.exp(c["logit"] - max_logit) for c in kept]
-    total = sum(probs)
-    if total <= 0 or not math.isfinite(total):
-        return False
-    idx = 0
-    for c in candidates:
-        if not c["keep"]:
-            c["prob"] = 0.0
-            continue
-        c["prob"] = probs[idx] / total
-        idx += 1
-    return True
-
-
-def generate_expected(count: int, config: SamplingConfig) -> list[int]:
-    rng = config.seed
-    history: list[int] = []
-    out: list[int] = []
-
-    for step in range(count):
-        logits = OFFLINE_LOGITS[step % len(OFFLINE_LOGITS)]
-        candidates = []
-        window = (
-            MAX_HISTORY
-            if config.history_window == 0
-            else max(1, min(config.history_window, MAX_HISTORY))
-        )
-        recent_history = history[-window:]
-
-        for token_id, base_logit in zip(OFFLINE_TOKEN_IDS, logits):
-            repeat_count = recent_history.count(token_id)
-            logit = base_logit
-            if repeat_count > 0:
-                if config.repeat_penalty > 0.0 and config.repeat_penalty != 1.0:
-                    if logit >= 0.0:
-                        logit /= config.repeat_penalty
-                    else:
-                        # Match llama-style behavior for negative logits.
-                        logit *= config.repeat_penalty
-                logit -= config.presence_penalty
-                logit -= repeat_count * config.frequency_penalty
-            if config.temperature > 0.0:
-                logit /= config.temperature
-            candidates.append(
-                {"token_id": token_id, "logit": logit, "prob": 0.0, "keep": True}
-            )
-
-        if 0 < config.top_k < len(candidates):
-            sorted_idx = sorted(
-                range(len(candidates)), key=lambda i: candidates[i]["logit"], reverse=True
-            )
-            for idx in sorted_idx[config.top_k :]:
-                candidates[idx]["keep"] = False
-
-        if config.temperature <= 0.0:
-            kept = [c for c in candidates if c["keep"]]
-            chosen = max(kept, key=lambda c: c["logit"])
-            token = chosen["token_id"]
-        else:
-            if not softmax_kept(candidates):
-                kept = [c for c in candidates if c["keep"]]
-                token = max(kept, key=lambda c: c["logit"])["token_id"]
-            else:
-                effective_top_p = max(config.top_p, 1e-6)
-                if effective_top_p < 1.0:
-                    sorted_kept = sorted(
-                        [c for c in candidates if c["keep"]],
-                        key=lambda c: c["prob"],
-                        reverse=True,
-                    )
-                    cumulative = 0.0
-                    keep_ids: set[int] = set()
-                    for idx, c in enumerate(sorted_kept):
-                        cumulative += c["prob"]
-                        keep_ids.add(c["token_id"])
-                        if cumulative >= effective_top_p and idx + 1 < len(sorted_kept):
-                            break
-                    for c in candidates:
-                        if c["keep"] and c["token_id"] not in keep_ids:
-                            c["keep"] = False
-
-                if not softmax_kept(candidates):
-                    kept = [c for c in candidates if c["keep"]]
-                    token = max(kept, key=lambda c: c["logit"])["token_id"]
-                else:
-                    if config.min_p > 0.0:
-                        kept = [c for c in candidates if c["keep"]]
-                        max_prob = max((c["prob"] for c in kept), default=0.0)
-                        threshold = config.min_p * max_prob
-                        for c in candidates:
-                            if c["keep"] and c["prob"] + EPSILON < threshold:
-                                c["keep"] = False
-                        if not any(c["keep"] for c in candidates):
-                            max(kept, key=lambda c: c["prob"])["keep"] = True
-
-                    if not softmax_kept(candidates):
-                        kept = [c for c in candidates if c["keep"]]
-                        token = max(kept, key=lambda c: c["logit"])["token_id"]
-                    else:
-                        threshold, rng = next_uniform(rng)
-                        cumulative = 0.0
-                        token = 0
-                        for c in candidates:
-                            if not c["keep"]:
-                                continue
-                            cumulative += c["prob"]
-                            token = c["token_id"]
-                            if threshold <= cumulative:
-                                break
-
-        out.append(token)
-        history.append(token)
-        if len(history) > MAX_HISTORY:
-            history = history[-MAX_HISTORY:]
-
-    return out
+GOLDEN_BY_CONFIG: dict[SamplingConfig, list[int]] = {
+    SamplingConfig(): [128000, 128007, 128001, 128000, 128006, 128002, 128000, 128006, 128000, 128000, 128007, 128000, 128001, 128000, 128006, 128001, 128007, 128000, 128007, 128001, 128001, 128002, 128002, 128007, 128000, 128006, 128001, 128007, 128000, 128002, 128001, 128001, 128000, 128007, 128003, 128000, 128002, 128006, 128001, 128006, 128003, 128000, 128000, 128002, 128007, 128007, 128000, 128007, 128000, 128002, 128007, 128001, 128007, 128006, 128001, 128006, 128001, 128000, 128006, 128006, 128006, 128001, 128007, 128002],
+    SamplingConfig(top_k=1): [128000, 128000, 128001, 128000, 128006, 128000, 128000, 128001, 128000, 128000, 128006, 128007, 128001, 128006, 128001, 128000, 128006, 128007, 128000, 128001, 128001, 128000, 128006, 128007, 128000, 128006, 128001, 128000, 128006, 128007, 128007, 128001, 128002, 128000, 128006, 128007, 128001, 128006, 128001, 128000, 128006, 128007, 128000, 128002, 128001, 128000, 128006, 128007, 128007, 128002, 128001, 128000, 128006, 128007, 128001, 128002, 128002, 128000, 128006, 128007, 128001, 128002, 128001, 128000],
+    SamplingConfig(top_p=1.0): [128000, 128007, 128001, 128000, 128006, 128006, 128000, 128007, 128000, 128000, 128002, 128007, 128000, 128001, 128006, 128001, 128007, 128000, 128007, 128001, 128000, 128002, 128002, 128007, 128000, 128006, 128001, 128006, 128000, 128002, 128000, 128000, 128001, 128002, 128003, 128000, 128002, 128006, 128001, 128007, 128003, 128000, 128001, 128002, 128000, 128006, 128001, 128000, 128007, 128007, 128006, 128001, 128007, 128002, 128001, 128006, 128001, 128000, 128006, 128006, 128007, 128001, 128002, 128002],
+    SamplingConfig(top_k=0): [128000, 128007, 128001, 128000, 128006, 128006, 128000, 128007, 128000, 128000, 128002, 128007, 128000, 128001, 128006, 128001, 128007, 128000, 128007, 128001, 128000, 128002, 128003, 128007, 128000, 128006, 128001, 128006, 128000, 128002, 128000, 128007, 128001, 128002, 128003, 128000, 128002, 128006, 128001, 128007, 128003, 128000, 128001, 128003, 128000, 128007, 128000, 128007, 128000, 128007, 128007, 128001, 128002, 128006, 128001, 128006, 128001, 128000, 128006, 128004, 128006, 128001, 128006, 128002],
+    SamplingConfig(min_p=0.0): [128000, 128007, 128001, 128000, 128006, 128002, 128000, 128006, 128000, 128000, 128007, 128000, 128001, 128000, 128006, 128001, 128007, 128000, 128007, 128001, 128001, 128002, 128002, 128007, 128000, 128006, 128001, 128007, 128000, 128002, 128001, 128001, 128000, 128007, 128003, 128000, 128002, 128006, 128001, 128006, 128003, 128000, 128000, 128002, 128007, 128007, 128000, 128007, 128000, 128002, 128007, 128001, 128007, 128006, 128001, 128006, 128001, 128000, 128006, 128006, 128006, 128001, 128007, 128002],
+    SamplingConfig(repeat_penalty=2.0, frequency_penalty=0.8, presence_penalty=0.5): [128000, 128007, 128001, 128006, 128002, 128002, 128000, 128006, 128003, 128001, 128003, 128007, 128004, 128001, 128005, 128007, 128002, 128000, 128000, 128006, 128001, 128001, 128000, 128007, 128006, 128003, 128002, 128002, 128003, 128006, 128004, 128001, 128007, 128002, 128004, 128000, 128003, 128006, 128007, 128007, 128004, 128000, 128001, 128000, 128002, 128007, 128003, 128006, 128001, 128002, 128000, 128005, 128004, 128001, 128006, 128003, 128005, 128007, 128006, 128007, 128005, 128003, 128001, 128004],
+    SamplingConfig(history_window=0): [128000, 128007, 128001, 128000, 128006, 128002, 128000, 128006, 128000, 128000, 128007, 128000, 128001, 128000, 128006, 128001, 128007, 128000, 128007, 128001, 128001, 128002, 128002, 128007, 128000, 128006, 128001, 128007, 128000, 128002, 128001, 128001, 128000, 128007, 128003, 128000, 128002, 128006, 128001, 128006, 128003, 128000, 128000, 128002, 128007, 128007, 128000, 128007, 128000, 128002, 128007, 128001, 128007, 128006, 128001, 128006, 128001, 128000, 128006, 128006, 128006, 128001, 128007, 128002],
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -197,6 +61,17 @@ def main() -> int:
         presence_penalty=args.presence_penalty,
         history_window=args.history_window,
     )
+    if config not in GOLDEN_BY_CONFIG:
+        print(f"Golden verify failed: unsupported parameter set: {config}")
+        return 2
+
+    expected_full = GOLDEN_BY_CONFIG[config]
+    if args.count > len(expected_full):
+        print(
+            f"Golden verify failed: count={args.count} exceeds golden length={len(expected_full)}"
+        )
+        return 2
+    expected = expected_full[: args.count]
 
     cmd = [
         args.executable,
@@ -236,7 +111,6 @@ def main() -> int:
             print(f"Golden verify failed: non-integer output line from C program: {stripped}")
             return 1
 
-    expected = generate_expected(args.count, config)
     if c_tokens != expected:
         print("Golden verify failed")
         print(f"Expected: {expected}")
