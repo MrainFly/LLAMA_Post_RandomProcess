@@ -20,7 +20,7 @@ typedef struct {
   float repeat_penalty;
   float frequency_penalty;
   float presence_penalty;
-  // 0 means use RP_MAX_HISTORY.
+  // 0 disables history-based penalties.
   size_t history_window;
 } rp_sampling_config;
 

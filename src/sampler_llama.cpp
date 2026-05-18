@@ -18,8 +18,7 @@ struct Candidate {
 constexpr double kMinTopP = 1e-6;
 
 size_t effective_history_window(const rp_sampling_config *config) {
-  // 0 is a sentinel value meaning "use maximum available history".
-  if (config->history_window == 0 || config->history_window > RP_MAX_HISTORY) {
+  if (config->history_window > RP_MAX_HISTORY) {
     return RP_MAX_HISTORY;
   }
   return config->history_window;
@@ -39,6 +38,9 @@ size_t token_repeat_count(const rp_sampler_state *state, uint32_t token_id,
 void apply_penalties(std::vector<Candidate> &candidates, const rp_sampler_state *state,
                      const rp_sampling_config *config) {
   const size_t window = effective_history_window(config);
+  if (window == 0 || state->history_len == 0) {
+    return;
+  }
   const size_t start =
       state->history_len > window ? state->history_len - window : 0;
   for (auto &c : candidates) {
@@ -122,15 +124,14 @@ void apply_top_p(std::vector<Candidate> &candidates, float p) {
             });
 
   double cumulative = 0.0;
-  size_t keep = 0;
+  size_t keep = 1;
   for (; keep < candidates.size(); ++keep) {
-    cumulative += candidates[keep].prob;
-    if (cumulative >= top_p && keep + 1 < candidates.size()) {
-      ++keep;
+    cumulative += candidates[keep - 1].prob;
+    if (cumulative >= top_p) {
       break;
     }
   }
-  candidates.resize(std::max<size_t>(1, keep));
+  candidates.resize(keep);
 }
 
 void apply_min_p(std::vector<Candidate> &candidates, float min_p) {
@@ -138,11 +139,12 @@ void apply_min_p(std::vector<Candidate> &candidates, float min_p) {
     return;
   }
 
-  double max_logit = -std::numeric_limits<double>::infinity();
+  compute_softmax(candidates);
+  double max_prob = 0.0;
   for (const auto &c : candidates) {
-    max_logit = std::max(max_logit, c.logit);
+    max_prob = std::max(max_prob, c.prob);
   }
-  const double threshold = max_logit + std::log(min_p);
+  const double threshold = max_prob * static_cast<double>(min_p);
 
   const auto best_it = std::max_element(
       candidates.begin(), candidates.end(),
@@ -156,8 +158,8 @@ void apply_min_p(std::vector<Candidate> &candidates, float min_p) {
 
   auto it = std::remove_if(candidates.begin(), candidates.end(),
                            [threshold](const Candidate &c) {
-                             return c.logit < threshold;
-                           });
+                              return c.prob < threshold;
+                            });
   candidates.erase(it, candidates.end());
   if (candidates.empty()) {
     candidates.push_back(fallback);
@@ -229,10 +231,10 @@ extern "C" uint32_t rp_sample_from_logits_llama_cpp(
   }
 
   apply_penalties(candidates, state, config);
-  apply_temperature(candidates, config->temperature);
   apply_top_k(candidates, config->top_k);
   apply_top_p(candidates, config->top_p);
   apply_min_p(candidates, config->min_p);
+  apply_temperature(candidates, config->temperature);
 
   const uint32_t sampled = sample_token(state, config, candidates);
   append_history(state, sampled);

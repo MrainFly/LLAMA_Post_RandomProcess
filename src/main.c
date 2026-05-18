@@ -29,6 +29,17 @@ static int parse_float_arg(const char *value, float min_value, float *out) {
   return 1;
 }
 
+static int parse_float_any_arg(const char *value, float *out) {
+  char *end = NULL;
+  errno = 0;
+  float parsed = strtof(value, &end);
+  if (errno != 0 || end == value || *end != '\0') {
+    return 0;
+  }
+  *out = parsed;
+  return 1;
+}
+
 static int parse_uint_arg(const char *value, uint32_t *out) {
   char *end = NULL;
   errno = 0;
@@ -106,15 +117,15 @@ int main(int argc, char **argv) {
       continue;
     }
     if (strcmp(arg, "--frequency-penalty") == 0 && i + 1 < argc) {
-      if (!parse_float_arg(argv[++i], 0.0f, &config.frequency_penalty)) {
-        fprintf(stderr, "frequency-penalty must be >= 0\n");
+      if (!parse_float_any_arg(argv[++i], &config.frequency_penalty)) {
+        fprintf(stderr, "frequency-penalty must be a valid float\n");
         return 1;
       }
       continue;
     }
     if (strcmp(arg, "--presence-penalty") == 0 && i + 1 < argc) {
-      if (!parse_float_arg(argv[++i], 0.0f, &config.presence_penalty)) {
-        fprintf(stderr, "presence-penalty must be >= 0\n");
+      if (!parse_float_any_arg(argv[++i], &config.presence_penalty)) {
+        fprintf(stderr, "presence-penalty must be a valid float\n");
         return 1;
       }
       continue;
