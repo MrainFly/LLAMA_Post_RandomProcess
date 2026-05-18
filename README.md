@@ -1,6 +1,6 @@
 # LLAMA_Post_RandomProcess
 
-离线 logits 驱动的采样后处理（C/C++ 混合实现，贴近 llama.cpp 社区实现）：`penalty -> temperature -> top-k -> top-p -> min-p -> sample`，并提供 Python golden 校验。
+离线 logits 驱动的采样后处理（C/C++ 混合实现，贴近 llama.cpp 社区实现）：`penalty -> top-k -> top-p -> min-p -> temperature -> sample`，并提供 Python golden 校验。
 
 ## Build
 
@@ -27,6 +27,8 @@ make
 ```bash
 ./random_token_demo 32 --seed 42 --top-k 4 --top-p 0.9 --min-p 0.05 --temperature 0.8
 ```
+
+说明：`--history-window 0` 表示关闭基于历史 token 的 penalty。
 
 运行旧版“固定 token 表随机 demo”：
 

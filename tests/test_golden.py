@@ -88,7 +88,7 @@ class GoldenVerifyTest(unittest.TestCase):
             msg=f"verify failed\nstdout:\n{verify.stdout}\nstderr:\n{verify.stderr}",
         )
 
-    def test_history_window_zero_means_max_history(self) -> None:
+    def test_history_window_zero_disables_history_penalties(self) -> None:
         verify = self.run_verify("--history-window", "0")
         self.assertEqual(
             0,
