@@ -16,16 +16,16 @@ RMS_NORM_EPSILON = 1e-6
 MIN_SUM_THRESHOLD = 1e-10
 
 
-def _sin_weight_init(seed: int, i: int, j: int, scale: float) -> float:
+def _sinusoidal_weight_init(seed: int, i: int, j: int, scale: float) -> float:
     return math.sin(seed * 0.01 + i * 0.37 + j * 0.13) * scale
 
 
 EMBED = [
-    [_sin_weight_init(11, i, j, 0.6) for j in range(DIM)]
+    [_sinusoidal_weight_init(11, i, j, 0.6) for j in range(DIM)]
     for i in range(len(TOKEN_IDS))
 ]
-W_HIDDEN = [[_sin_weight_init(17, i, j, 0.3) for j in range(DIM)] for i in range(DIM)]
-W_OUT = [[_sin_weight_init(23, i, j, 0.5) for j in range(DIM)] for i in range(len(TOKEN_IDS))]
+W_HIDDEN = [[_sinusoidal_weight_init(17, i, j, 0.3) for j in range(DIM)] for i in range(DIM)]
+W_OUT = [[_sinusoidal_weight_init(23, i, j, 0.5) for j in range(DIM)] for i in range(len(TOKEN_IDS))]
 
 
 @dataclass
@@ -46,8 +46,8 @@ def rmsnorm(vec: list[float], eps: float = RMS_NORM_EPSILON) -> list[float]:
 def inference_step(state: TinyState, token_id: int) -> list[float]:
     idx = TOKEN_INDEX.get(token_id, 0)
     emb = EMBED[idx]
-    recur = matvec(W_HIDDEN, state.hidden)
-    mixed = [math.tanh(0.7 * recur[i] + emb[i]) for i in range(DIM)]
+    recurrent_output = matvec(W_HIDDEN, state.hidden)
+    mixed = [math.tanh(0.7 * recurrent_output[i] + emb[i]) for i in range(DIM)]
     state.hidden = rmsnorm(mixed)
     return matvec(W_OUT, state.hidden)
 
@@ -91,9 +91,12 @@ def main() -> int:
     if args.steps <= 0:
         print("Error: steps must be > 0", file=sys.stderr)
         return 2
+    if args.tokens is not None and len(args.tokens) == 0:
+        print("Error: --tokens cannot be empty", file=sys.stderr)
+        return 2
 
     state = TinyState(hidden=[0.0] * DIM)
-    prompt = args.tokens or [TOKEN_IDS[0]]
+    prompt = args.tokens if args.tokens is not None else [TOKEN_IDS[0]]
 
     for token in prompt:
         _ = inference_step(state, token)
