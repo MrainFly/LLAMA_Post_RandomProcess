@@ -3,9 +3,7 @@ import subprocess
 import unittest
 
 
-REPO_ROOT = pathlib.Path(
-    "/home/runner/work/LLAMA_Post_RandomProcess/LLAMA_Post_RandomProcess"
-)
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 class GoldenVerifyTest(unittest.TestCase):

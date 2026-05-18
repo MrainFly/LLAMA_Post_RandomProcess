@@ -25,7 +25,7 @@ make
 ## Golden Verify
 
 ```bash
-python3 /home/runner/work/LLAMA_Post_RandomProcess/LLAMA_Post_RandomProcess/tools/golden_verify.py ./random_token_demo 32
+python3 tools/golden_verify.py ./random_token_demo 32
 ```
 
 ## Test
