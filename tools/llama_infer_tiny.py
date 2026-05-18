@@ -5,12 +5,15 @@ from __future__ import annotations
 
 import argparse
 import math
+import sys
 from dataclasses import dataclass
 
 
 TOKEN_IDS = [128000, 128001, 128002, 128003, 128004, 128005, 128006, 128007]
 TOKEN_INDEX = {token: i for i, token in enumerate(TOKEN_IDS)}
 DIM = 8
+RMS_NORM_EPSILON = 1e-6
+MIN_SUM_THRESHOLD = 1e-10
 
 
 def _sin_init(seed: int, i: int, j: int, scale: float) -> float:
@@ -34,7 +37,7 @@ def matvec(matrix: list[list[float]], vec: list[float]) -> list[float]:
     return [sum(row[k] * vec[k] for k in range(len(vec))) for row in matrix]
 
 
-def rmsnorm(vec: list[float], eps: float = 1e-6) -> list[float]:
+def rmsnorm(vec: list[float], eps: float = RMS_NORM_EPSILON) -> list[float]:
     mean_sq = sum(v * v for v in vec) / len(vec)
     inv = 1.0 / math.sqrt(mean_sq + eps)
     return [v * inv for v in vec]
@@ -53,7 +56,7 @@ def softmax(logits: list[float]) -> list[float]:
     m = max(logits)
     exps = [math.exp(v - m) for v in logits]
     s = sum(exps)
-    if s < 1e-10:
+    if s < MIN_SUM_THRESHOLD:
         return [1.0 / len(logits)] * len(logits)
     return [v / s for v in exps]
 
@@ -86,7 +89,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if args.steps <= 0:
-        print("steps must be > 0")
+        print("Error: steps must be > 0", file=sys.stderr)
         return 2
 
     state = TinyState(hidden=[0.0] * DIM)
