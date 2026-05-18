@@ -51,6 +51,7 @@ static void print_usage(const char *program) {
 
 int main(int argc, char **argv) {
   int count = 16;
+  int count_set = 0;
   int use_table_demo = 0;
   rp_sampling_config config;
   rp_sampler_state state;
@@ -128,10 +129,15 @@ int main(int argc, char **argv) {
       continue;
     }
 
+    if (count_set) {
+      print_usage(argv[0]);
+      return 1;
+    }
     if (!parse_int_arg(arg, 1, &count)) {
       print_usage(argv[0]);
       return 1;
     }
+    count_set = 1;
   }
 
   if (use_table_demo) {
