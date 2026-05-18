@@ -16,6 +16,7 @@ struct Candidate {
 };
 
 size_t effective_history_window(const rp_sampling_config *config) {
+  // 0 is a sentinel value meaning "use maximum available history".
   if (config->history_window == 0 || config->history_window > RP_MAX_HISTORY) {
     return RP_MAX_HISTORY;
   }
@@ -162,6 +163,7 @@ void apply_min_p(std::vector<Candidate> &candidates, float min_p) {
 }
 
 double next_uniform(rp_sampler_state *state) {
+  // LCG (linear congruential generator), aligned with the C-side legacy RNG.
   state->rng_state = (1103515245u * state->rng_state + 12345u) & 0x7fffffffu;
   return static_cast<double>(state->rng_state) / static_cast<double>(0x80000000u);
 }
