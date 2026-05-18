@@ -121,8 +121,8 @@ int main(int argc, char **argv) {
     }
     if (strcmp(arg, "--history-window") == 0 && i + 1 < argc) {
       int parsed_window = 0;
-      if (!parse_int_arg(argv[++i], 1, &parsed_window)) {
-        fprintf(stderr, "history-window must be >= 1\n");
+      if (!parse_int_arg(argv[++i], 0, &parsed_window)) {
+        fprintf(stderr, "history-window must be >= 0\n");
         return 1;
       }
       config.history_window = (size_t)parsed_window;

@@ -68,10 +68,11 @@ def generate_expected(count: int, config: SamplingConfig) -> list[int]:
     for step in range(count):
         logits = OFFLINE_LOGITS[step % len(OFFLINE_LOGITS)]
         candidates = []
-        effective_history_window = (
-            MAX_HISTORY if config.history_window == 0 else config.history_window
+        window = (
+            MAX_HISTORY
+            if config.history_window == 0
+            else max(1, min(config.history_window, MAX_HISTORY))
         )
-        window = max(1, min(effective_history_window, MAX_HISTORY))
         recent_history = history[-window:]
 
         for token_id, base_logit in zip(OFFLINE_TOKEN_IDS, logits):
